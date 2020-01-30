@@ -254,18 +254,18 @@ class Carrier extends AbstractCarrier implements CarrierInterface
         $logger->info(var_export($data, true));
     }
 
-    private function getConfigData($key) {
+    public function getConfigData($key) {
         return $this->scopeConfig->getValue('general/options/shiphawk_'.$key, \Magento\Store\Model\ScopeInterface::SCOPE_STORE);
     }
 
-    private function getOrigRegionCode() {
+    public function getOrigRegionCode() {
             $origRegionId = $this->scopeConfig->getValue(Config::XML_PATH_ORIGIN_REGION_ID);
             $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
             $region = $objectManager->create('Magento\Directory\Model\RegionFactory')->create();
             return $region->load($origRegionId)->getCode();
     }
 
-    private function getOriginCountryCode($request) {
+    public function getOriginCountryCode($request) {
             if ($request->getOrigCountry()) {
                     $origCountry = $request->getOrigCountry();
             } else {
@@ -275,7 +275,7 @@ class Carrier extends AbstractCarrier implements CarrierInterface
             return $origCountry;
     }
 
-    private function getOriginCity($request) {
+    public function getOriginCity($request) {
             if ($request->getOrigCity()) {
                     $origCity = $request->getOrigCity();
             } else {
