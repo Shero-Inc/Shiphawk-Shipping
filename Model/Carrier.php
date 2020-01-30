@@ -44,6 +44,7 @@ class Carrier extends AbstractCarrier implements CarrierInterface
      * @param MethodFactory $rateMethodFactory
      * @param array $data
      */
+
     public function __construct(
         ScopeConfigInterface $scopeConfig,
         ErrorFactory $rateErrorFactory,
@@ -85,7 +86,7 @@ class Carrier extends AbstractCarrier implements CarrierInterface
         /**
          * Make sure that Shipping method is enabled
          */
-        if (!$this->isActive()) {
+        if (!$this->getConfigFlag('active')) {
             return false;
         }
 
@@ -97,17 +98,23 @@ class Carrier extends AbstractCarrier implements CarrierInterface
         $rateRequest = array(
             'items' => $items,
             'origin_address'=> array(
+                'state'=> $this->getOrigRegionCode(),
+                'country' => $this->getOriginCountryCode($request),
+                'city' => $this->getOriginCity($request),
                 'zip'=> $this->scopeConfig->getValue($origin_zip)
             ),
             'destination_address'=> array(
-                'zip'               =>  $to_zip = $request->getDestPostcode()
+                'zip' => $request->getDestPostcode(),
+                'country' => $request->getDestCountryId(),
+                'state' => $request->getDestRegionCode(),
+                'city' => $request->getDestCity(),
+                'street1' => $request->getDestStreet(),
+                'is_residential' => 'true'
             ),
             'apply_rules'=>'true'
         );
 
         $rateResponse = $this->getRates($rateRequest);
-
-
 
         if(property_exists($rateResponse, 'error')) {
             $this->logger->addError(var_export($rateResponse->error, true));
@@ -143,15 +150,7 @@ class Carrier extends AbstractCarrier implements CarrierInterface
         /**
          * Displayed as shipping method
          */
-        $methodTitle = $rateRow->service_name;
-
-        // Show estimated delivery dates
-        if ($this->getConfigData('showdates') == 1) {
-            if (!empty($rateRow->est_delivery_date)) {
-                $estDate = date('l, F j Y', strtotime($rateRow->est_delivery_date));
-                $rateResultMethod->setData('carrier_title', $rateRow->carrier . ' - Estimated Delivery: ' . $estDate);
-            }
-        }
+        $methodTitle = $rateRow->service_name;;
 
         $rateResultMethod->setData('method_title', $methodTitle);
         $rateResultMethod->setData('method', $methodTitle);
@@ -175,7 +174,6 @@ class Carrier extends AbstractCarrier implements CarrierInterface
     }
 
     protected function _get($jsonRateRequest) {
-
         $params = http_build_query(['api_key' => $this->getConfigData('api_key')]);
         $ch_url = $this->getConfigData('gateway_url') . 'rates' . '?' . $params;
 
@@ -254,5 +252,36 @@ class Carrier extends AbstractCarrier implements CarrierInterface
         $logger = new \Zend\Log\Logger();
         $logger->addWriter($writer);
         $logger->info(var_export($data, true));
+    }
+
+    private function getConfigData($key) {
+        return $this->scopeConfig->getValue('general/options/shiphawk_'.$key, \Magento\Store\Model\ScopeInterface::SCOPE_STORE);
+    }
+
+    private function getOrigRegionCode() {
+            $origRegionId = $this->scopeConfig->getValue(Config::XML_PATH_ORIGIN_REGION_ID);
+            $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
+            $region = $objectManager->create('Magento\Directory\Model\RegionFactory')->create();
+            return $region->load($origRegionId)->getCode();
+    }
+
+    private function getOriginCountryCode($request) {
+            if ($request->getOrigCountry()) {
+                    $origCountry = $request->getOrigCountry();
+            } else {
+                    $origCountry = $this->_scopeConfig->getValue(\Magento\Sales\Model\Order\Shipment::XML_PATH_STORE_COUNTRY_ID, \Magento\Store\Model\ScopeInterface::SCOPE_STORE, $request->getStoreId());
+            }
+
+            return $origCountry;
+    }
+
+    private function getOriginCity($request) {
+            if ($request->getOrigCity()) {
+                    $origCity = $request->getOrigCity();
+            } else {
+                    $origCity = $this->_scopeConfig->getValue(\Magento\Sales\Model\Order\Shipment::XML_PATH_STORE_CITY, \Magento\Store\Model\ScopeInterface::SCOPE_STORE, $request->getStoreId());
+            }
+
+            return $origCity;
     }
 }
